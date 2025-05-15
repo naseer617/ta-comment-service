@@ -1,0 +1,6 @@
+fastapi
+uvicorn[standard]
+sqlalchemy
+asyncpg            # For PostgreSQL async support
+pydantic
+python-dotenv      # For loading .env if needed
