@@ -1,0 +1,9 @@
+services:
+  test-db:
+    image: postgres:14
+    environment:
+      POSTGRES_DB: test_db
+      POSTGRES_USER: test_user
+      POSTGRES_PASSWORD: test_pw
+    ports:
+      - "5439:5432"  # avoid clashing with dev DB
