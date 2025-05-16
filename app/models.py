@@ -1,10 +1,11 @@
-from sqlalchemy import Integer, String, Boolean
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, func
 from shared.db.base import Base
 
 class FeedbackDB(Base):
     __tablename__ = "feedbacks"
 
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
-    feedback: Mapped[str] = mapped_column(String, nullable=False)
-    deleted: Mapped[bool] = mapped_column(Boolean, default=False)
+    id = Column(Integer, primary_key=True, index=True)
+    feedback = Column(String, nullable=False)
+    deleted = Column(Boolean, default=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)

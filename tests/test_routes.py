@@ -7,6 +7,7 @@ from sqlalchemy import Result, Update, ScalarResult, Select
 from shared.db.connection import get_session
 from app.models import FeedbackDB
 from app.main import app as fastapi_app
+from datetime import datetime, timezone
 
 @pytest.fixture
 def app():
@@ -21,13 +22,21 @@ async def test_create_and_get_feedback(async_client):
     assert response.status_code == 200
     data = response.json()
     assert data["feedback"] == "Test feedback"
+    assert "created_at" in data
+    assert "updated_at" in data
+    assert isinstance(datetime.fromisoformat(data["created_at"].replace('Z', '+00:00')), datetime)
+    assert isinstance(datetime.fromisoformat(data["updated_at"].replace('Z', '+00:00')), datetime)
 
     # Get
     response = await async_client.get("/comments")
     assert response.status_code == 200
     feedbacks = response.json()
     assert isinstance(feedbacks, list)
-    assert any(f["feedback"] == "Test feedback" for f in feedbacks)
+    feedback = next(f for f in feedbacks if f["feedback"] == "Test feedback")
+    assert "created_at" in feedback
+    assert "updated_at" in feedback
+    assert isinstance(datetime.fromisoformat(feedback["created_at"].replace('Z', '+00:00')), datetime)
+    assert isinstance(datetime.fromisoformat(feedback["updated_at"].replace('Z', '+00:00')), datetime)
 
 @pytest.mark.asyncio
 async def test_soft_delete_feedbacks(async_client):
@@ -147,11 +156,19 @@ async def test_create_feedback_with_refresh(async_client, app):
     mock_session.commit = AsyncMock()
     mock_session.refresh = AsyncMock()
 
-    # Create a feedback object with an ID
-    new_feedback = FeedbackDB(id=1, feedback="Test feedback")
+    # Create a feedback object with an ID and timestamps
+    now = datetime.now(timezone.utc)
+    new_feedback = FeedbackDB(
+        id=1,
+        feedback="Test feedback",
+        created_at=now,
+        updated_at=now
+    )
     # Set the refresh to modify the passed object
     async def mock_refresh(obj):
         obj.id = 1
+        obj.created_at = now
+        obj.updated_at = now
     mock_session.refresh.side_effect = mock_refresh
 
     # Make add and commit return None (they don't return anything in real usage)
@@ -171,8 +188,12 @@ async def test_create_feedback_with_refresh(async_client, app):
         data = response.json()
         assert data["id"] == 1
         assert data["feedback"] == "Test feedback"
+        assert "created_at" in data
+        assert "updated_at" in data
+        assert isinstance(datetime.fromisoformat(data["created_at"].replace('Z', '+00:00')), datetime)
+        assert isinstance(datetime.fromisoformat(data["updated_at"].replace('Z', '+00:00')), datetime)
         mock_session.refresh.assert_awaited_once()
-        mock_session.add.assert_called_once()  # Use assert_called_once instead of assert_awaited_once
+        mock_session.add.assert_called_once()
         mock_session.commit.assert_awaited_once()
     finally:
         app.dependency_overrides.clear()
@@ -182,11 +203,16 @@ async def test_get_feedbacks_with_deleted(async_client, app):
     # Create a mock session that returns both deleted and non-deleted feedbacks
     mock_session = AsyncMock(spec=AsyncSession)
 
-    # Create the feedbacks we want to return
-    # Note: The route's query includes .where(FeedbackDB.deleted == False)
-    # so we should only return non-deleted feedbacks in our mock
+    # Create the feedbacks we want to return with timestamps
+    now = datetime.now(timezone.utc)
     feedbacks = [
-        FeedbackDB(id=1, feedback="Active feedback", deleted=False)
+        FeedbackDB(
+            id=1,
+            feedback="Active feedback",
+            deleted=False,
+            created_at=now,
+            updated_at=now
+        )
     ]
 
     # Create a mock result that properly simulates SQLAlchemy's scalars().all() chain
@@ -208,6 +234,10 @@ async def test_get_feedbacks_with_deleted(async_client, app):
         assert len(feedbacks) == 1  # Only non-deleted feedback should be returned
         assert feedbacks[0]["feedback"] == "Active feedback"
         assert feedbacks[0]["id"] == 1
+        assert "created_at" in feedbacks[0]
+        assert "updated_at" in feedbacks[0]
+        assert isinstance(datetime.fromisoformat(feedbacks[0]["created_at"].replace('Z', '+00:00')), datetime)
+        assert isinstance(datetime.fromisoformat(feedbacks[0]["updated_at"].replace('Z', '+00:00')), datetime)
     finally:
         app.dependency_overrides.clear()
 
