@@ -21,7 +21,6 @@ wheels/
 *.egg
 
 # Virtual Environment
-.env
 .venv
 env/
 venv/
@@ -49,5 +48,3 @@ log/
 *.sqlite3
 *.sqlite
 
-# Service-specific
-tests/test-config/.env.test
